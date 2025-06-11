@@ -39,7 +39,7 @@ final class ImageController extends AbstractController
         return $this->json([
             'uploaded' => true,
             'filename' => $uploadedFilename
-        ]);
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/{id}/{filename}', name: 'image_get', methods: ['GET', 'DELETE'])]

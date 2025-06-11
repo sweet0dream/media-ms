@@ -7,10 +7,6 @@ namespace App\Service;
 use CodeBuds\WebPConverter\WebPConverter;
 use DateTimeImmutable;
 use Exception;
-use Imagine\Image\Box;
-use Imagine\Image\ImageInterface;
-use Imagine\Image\ImagineInterface;
-use Imagine\Image\Point;
 use SplFileObject;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\File\File;
@@ -22,7 +18,7 @@ class ImageService
 
     public function __construct(
         #[Autowire('%kernel.project_dir%/public/media/')] public string $mediaDir,
-        private readonly ImagineInterface $imagine,
+        private ResizeService $resizeService,
     ) {
         if (!is_dir($this->mediaDir)) {
             mkdir(directory: $this->mediaDir, recursive: true);
@@ -48,7 +44,7 @@ class ImageService
         $file = new File($uploadFile);
 
         if (!in_array($file->guessExtension(), self::SUPPORTED_EXTENSIONS)) {
-            $this->dropFile($id, $uploadFile);
+            $this->dropFile($this->mediaDir . $id . '/', $filename);
             throw new Exception('Unsupported file type');
         }
 
@@ -65,7 +61,7 @@ class ImageService
                     'quality' => 100,
                 ]
             );
-            $this->dropFile($id, $uploadFile);
+            $this->dropFile($this->mediaDir . $id . '/', $filename);
         }
 
         return $filename;
@@ -79,7 +75,7 @@ class ImageService
         return new SplFileObject($this->mediaDir . $id . '/' . $filename);
     }
 
-    public function viewThumbnail(
+    public function thumbnail(
         int $id,
         string $size,
         string $filename,
@@ -90,47 +86,61 @@ class ImageService
         }
 
         if (!file_exists($this->mediaDir . $id . '/thumbnails/' . $size . '/' . $filename)) {
-            $extractSize = array_combine(['width', 'height'], explode('x', $size));
-
-            $image = $this->imagine->open($this->mediaDir . $id . '/' . $filename);
-
-            switch (true) {
-                case $extractSize['width'] == 0:
-                    $image->thumbnail(new Box($image->getSize()->getWidth(), $extractSize['height']));
-                    break;
-                case $extractSize['height'] == 0:
-                    $image->thumbnail(new Box($extractSize['width'], $image->getSize()->getHeight()));
-                    break;
-                default:
-                    $image->resize(new Box($extractSize['width'], $extractSize['height']));
-            }
-
-            $image->save($this->mediaDir . $id . '/thumbnails/' . $size . '_' . $filename, [
-                'quality' => 100,
-                'format' => 'webp'
-            ]);
+            $extractSize = array_combine(['width', 'height'], array_map('intval', explode('x', $size)));
+            $this->resizeService->resize(
+                source: $this->mediaDir . $id . '/' . $filename,
+                save: $this->mediaDir . $id . '/thumbnails/' . $size . '_' . $filename,
+                width: $extractSize['width'],
+                height: $extractSize['height']
+            );
         }
 
         return new SplFileObject($this->mediaDir . $id . '/thumbnails/' . $size . '_' . $filename);
     }
 
-    private function dropFile(
-        int $id,
-        string $file
-    ): void {
-        unlink($file);
+    public function delete(
+        $id,
+        $filename
+    ): bool {
+        $this->dropFile(
+            path: $this->mediaDir . $id . '/',
+            filename: $filename . '.webp'
+        );
 
-        if (function() use ($id) {
-            $handle = opendir($this->mediaDir . $id);
-            while (false !== ($entry = readdir($handle))) {
-                if ($entry !== '.' && $entry !== '..') {
-                    return false;
+        return true;
+    }
+
+    private function dropFile(
+        string $path,
+        string $filename
+    ): void {
+        if (is_dir($path. 'thumbnails/')) {
+            foreach (glob($path . 'thumbnails/*') as $file) {
+                if (explode('_', $file)[1] === $filename) {
+                    unlink($file);
                 }
             }
+            $this->dropDirectory($path . 'thumbnails/');
+        }
+        if (file_exists($path . $filename)) {
+            unlink($path . $filename);
+        }
+        $this->dropDirectory($path);
+    }
 
-            return true;
-        }) {
-            rmdir($this->mediaDir . $id);
+    private function dropDirectory(
+        string $path,
+    ): void {
+        $handle = opendir($path);
+        $empty = true;
+        while (false !== ($entry = readdir($handle))) {
+            if ($entry !== '.' && $entry !== '..') {
+                $empty = false;
+            }
+        }
+
+        if ($empty) {
+            rmdir($path);
         }
     }
 }

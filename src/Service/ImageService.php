@@ -11,14 +11,16 @@ use SplFileObject;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\File\File;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ImageService
 {
+    private const NOT_FOUND_FILE_MESSAGE = 'File not found';
     private const SUPPORTED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
     public function __construct(
-        #[Autowire('%kernel.project_dir%/public/media/')] public string $mediaDir,
-        private ResizeService $resizeService,
+        #[Autowire('%kernel.project_dir%/public/media')] public string $mediaDir,
+        private readonly ResizeService $resizeService,
     ) {
         if (!is_dir($this->mediaDir)) {
             mkdir(directory: $this->mediaDir, recursive: true);
@@ -32,24 +34,32 @@ class ImageService
         int $id,
         Request $request,
     ): string {
-        if (!is_dir($this->mediaDir . $id)) {
-            mkdir(directory: $this->mediaDir . $id, recursive: true);
+        $path = $this->generatePath([
+            $this->mediaDir,
+            $id
+        ]);
+
+        if (!is_dir($path)) {
+            mkdir(
+                directory: $path,
+                recursive: true
+            );
         }
 
         $filename = (new DatetimeImmutable())->format('YmdHis');
-        $uploadFile = $this->mediaDir . $id . '/' . $filename;
+        $uploadFile = $path . $filename;
 
         file_put_contents($uploadFile, $request->getContent());
 
         $file = new File($uploadFile);
 
         if (!in_array($file->guessExtension(), self::SUPPORTED_EXTENSIONS)) {
-            $this->dropFile($this->mediaDir . $id . '/', $filename);
+            $this->dropFile($path, $filename);
             throw new Exception('Unsupported file type');
         }
 
         if ($file->guessExtension() === 'webp') {
-            $file->move($this->mediaDir . $id, $filename . '.webp');
+            $file->move($path, $filename . '.webp');
         } else {
             WebPConverter::createWebpImage(
                 $file,
@@ -57,45 +67,71 @@ class ImageService
                     'saveFile' => true,
                     'filename' => $filename,
                     'force' => true,
-                    'savePath' => $this->mediaDir . $id,
+                    'savePath' => $path,
                     'quality' => 100,
                 ]
             );
-            $this->dropFile($this->mediaDir . $id . '/', $filename);
+            $this->dropFile($path, $filename);
         }
 
         return $filename;
     }
 
+    /**
+     * @throws NotFoundHttpException
+     */
     public function view(
         int $id,
         string $filename,
     ): SplFileObject
     {
-        return new SplFileObject($this->mediaDir . $id . '/' . $filename);
+        $path = $this->generatePath([
+            $this->mediaDir,
+            $id
+        ]);
+
+        $this->handleExistFile(
+            path: $path,
+            filename: $filename,
+        );
+
+        return new SplFileObject($path . $filename);
     }
 
+    /**
+     * @throws NotFoundHttpException
+     */
     public function thumbnail(
         int $id,
         string $size,
         string $filename,
     ): SplFileObject
     {
-        if (!is_dir($this->mediaDir . $id . '/thumbnails/')) {
-            mkdir(directory: $this->mediaDir . $id . '/thumbnails/', recursive: true);
+        $path = $this->generatePath([
+            $this->mediaDir,
+            $id
+        ]);
+
+        $this->handleExistFile(
+            path: $path,
+            filename: $filename,
+        );
+
+        if (!is_dir($path . 'thumbnails/')) {
+            mkdir(directory: $path . 'thumbnails/', recursive: true);
         }
 
-        if (!file_exists($this->mediaDir . $id . '/thumbnails/' . $size . '/' . $filename)) {
+        if (!file_exists($path . 'thumbnails/' . $size . '_' . $filename)) {
             $extractSize = array_combine(['width', 'height'], array_map('intval', explode('x', $size)));
             $this->resizeService->resize(
-                source: $this->mediaDir . $id . '/' . $filename,
-                save: $this->mediaDir . $id . '/thumbnails/' . $size . '_' . $filename,
+                source: $path . $filename,
+                save: $path . 'thumbnails/' . $size . '_' . $filename,
                 width: $extractSize['width'],
                 height: $extractSize['height']
             );
         }
 
-        return new SplFileObject($this->mediaDir . $id . '/thumbnails/' . $size . '_' . $filename);
+        return new SplFileObject($path . 'thumbnails/' . $size . '_' . $filename);
     }
 
     public function delete(
@@ -103,11 +139,31 @@ class ImageService
         $filename
     ): bool {
         $this->dropFile(
-            path: $this->mediaDir . $id . '/',
+            path: $this->generatePath([
+                $this->mediaDir,
+                $id
+            ]),
             filename: $filename . '.webp'
         );
 
         return true;
+    }
+
+    private function generatePath(array $data): string
+    {
+        return implode('/', $data) . '/';
+    }
+
+    /**
+     * @throws NotFoundHttpException
+     */
+    private function handleExistFile(
+        string $path,
+        string $filename
+    ): void {
+        if (!file_exists($path . $filename)) {
+            throw new NotFoundHttpException(self::NOT_FOUND_FILE_MESSAGE);
+        }
     }
 
     private function dropFile(

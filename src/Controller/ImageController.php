@@ -11,6 +11,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class ImageController extends AbstractController
@@ -26,7 +27,6 @@ final class ImageController extends AbstractController
         int $id,
         Request $request
     ): JsonResponse {
-
         try {
             $uploadedFilename = $this->imageService->upload($id, $request);
         } catch (Exception $e) {
@@ -46,20 +46,25 @@ final class ImageController extends AbstractController
     public function viewImage(
         int $id,
         string $filename,
-    ): JsonResponse|BinaryFileResponse {
-        if ($this->requestStack->getCurrentRequest()->getMethod() === 'DELETE') {
-            $this->json([], Response::HTTP_NO_CONTENT);
+    ): Response|BinaryFileResponse {
+        switch ($this->requestStack->getCurrentRequest()->getMethod()) {
+            case Request::METHOD_GET:
+                try {
+                    return $this->file(
+                        file: $this->imageService->view($id, $filename),
+                        disposition: ResponseHeaderBag::DISPOSITION_INLINE
+                    );
+                } catch (NotFoundHttpException $e) {
+                    return new Response('', Response::HTTP_NOT_FOUND);
+                }
+            case Request::METHOD_DELETE:
+                return $this->json(
+                    data: $this->imageService->delete($id, $filename),
+                    status: Response::HTTP_NO_CONTENT
+                );
+            default:
+                return $this->json([], Response::HTTP_METHOD_NOT_ALLOWED);
         }
-
-        return match ($this->requestStack->getCurrentRequest()->getMethod()) {
-            Request::METHOD_GET => $this->file(
-                file: $this->imageService->view($id, $filename),
-                disposition: ResponseHeaderBag::DISPOSITION_INLINE
-            ),
-            Request::METHOD_DELETE => $this->json(
-                $this->imageService->delete($id, $filename), Response::HTTP_NO_CONTENT),
-            default => $this->json([], Response::HTTP_METHOD_NOT_ALLOWED),
-        };
     }
 
     #[Route('/{id}/{size}/{filename}', name: 'image_get_thumbnail')]
@@ -67,10 +72,15 @@ final class ImageController extends AbstractController
         int $id,
         string $size,
         string $filename,
-    ): BinaryFileResponse {
-        return $this->file(
-            file: $this->imageService->thumbnail($id, $size, $filename),
-            disposition: ResponseHeaderBag::DISPOSITION_INLINE
-        );
+    ): Response|BinaryFileResponse {
+        try {
+            return $this->file(
+                file: $this->imageService->thumbnail($id, $size, $filename),
+                disposition: ResponseHeaderBag::DISPOSITION_INLINE
+            );
+        } catch (NotFoundHttpException $e) {
+            return new Response('', Response::HTTP_NOT_FOUND);
+        }
+
     }
 }

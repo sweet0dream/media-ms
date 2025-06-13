@@ -1,0 +1,265 @@
+{
+	"info": {
+		"_postman_id": "5fe0f08c-0edb-4b99-9700-8f33497784bc",
+		"name": "Media",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "38248815"
+	},
+	"item": [
+		{
+			"name": "Upload",
+			"item": [
+				{
+					"name": "ValidCase",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 201\", function () {",
+									"  pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Set filename as: \" + pm.response.json().filename, function () {",
+									"  const responseData = pm.response.json();",
+									"  pm.expect(responseData).to.have.property('uploaded').equal(true);",
+									"  pm.expect(responseData).to.have.property('filename');",
+									"  pm.collectionVariables.set('filename', responseData.filename);",
+									"});",
+									"",
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "file",
+							"file": {
+								"src": "postman-cloud:///1f046b6c-a154-4870-a3a8-72bd3809a67f"
+							}
+						},
+						"url": "https://media2.local/{{id}}/save"
+					},
+					"response": []
+				},
+				{
+					"name": "InvalidCase",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "file",
+							"file": {
+								"src": "/home/dev/Pictures/Screenshot.png"
+							}
+						},
+						"url": "https://media2.local/123456/save"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Resize",
+			"item": [
+				{
+					"name": "GetOriginal",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"  pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "https://media2.local/{{id}}/{{filename}}.webp"
+					},
+					"response": []
+				},
+				{
+					"name": "ResizeToWidth",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"  pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "https://media2.local/{{id}}/{{sizeWidth}}/{{filename}}.webp"
+					},
+					"response": []
+				},
+				{
+					"name": "ResizeToHeight",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"  pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "https://media2.local/{{id}}/{{sizeHeight}}}}/{{filename}}.webp"
+					},
+					"response": []
+				},
+				{
+					"name": "ResizeToWidth&Height",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 200\", function () {",
+									"  pm.response.to.have.status(200);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "https://media2.local/{{id}}/{{sizeWidthHeight}}}}}}/{{filename}}.webp"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Drop",
+			"item": [
+				{
+					"name": "Delete",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 204\", function () {",
+									"  pm.response.to.have.status(204);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": "https://media2.local/{{id}}/{{filename}}"
+					},
+					"response": []
+				},
+				{
+					"name": "CheckDeleted",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"pm.test(\"Response status code is 404\", function () {",
+									"  pm.response.to.have.status(404);",
+									"});"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": "https://media2.local/{{id}}/{{filename}}.webp"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "id",
+			"value": "1234567890",
+			"type": "string"
+		},
+		{
+			"key": "filename",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "sizeWidth",
+			"value": "300x0",
+			"type": "string"
+		},
+		{
+			"key": "sizeHeight",
+			"value": "0x300",
+			"type": "string"
+		},
+		{
+			"key": "sizeWidthHeight",
+			"value": "300x300",
+			"type": "string"
+		}
+	]
+}

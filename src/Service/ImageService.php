@@ -79,12 +79,12 @@ class ImageService
 
     /**
      * @throws NotFoundHttpException
+     * @throws Exception
      */
     public function view(
         int $id,
         string $filename,
-    ): SplFileObject
-    {
+    ): SplFileObject {
         $path = $this->generatePath([
             $this->mediaDir,
             $id
@@ -100,13 +100,13 @@ class ImageService
 
     /**
      * @throws NotFoundHttpException
+     * @throws Exception
      */
     public function thumbnail(
         int $id,
         string $size,
         string $filename,
-    ): SplFileObject
-    {
+    ): SplFileObject {
         $path = $this->generatePath([
             $this->mediaDir,
             $id
@@ -156,13 +156,41 @@ class ImageService
 
     /**
      * @throws NotFoundHttpException
+     * @throws Exception
      */
     private function handleExistFile(
         string $path,
         string $filename
     ): void {
+        $this->convertImage($path, $filename);
+
         if (!file_exists($path . $filename)) {
             throw new NotFoundHttpException(self::NOT_FOUND_FILE_MESSAGE);
+        }
+    }
+
+    /**
+     * @throws Exception
+     */
+    private function convertImage(
+        string $path,
+        string $filename
+    ): void {
+        if (file_exists($path . explode('.', $filename)[0] . '.jpg')) {
+            $filename = explode('.', $filename)[0];
+            $file = new File($path . $filename . '.jpg');
+
+            WebPConverter::createWebpImage(
+                $file,
+                [
+                    'saveFile' => true,
+                    'filename' => $filename,
+                    'force' => true,
+                    'savePath' => $path,
+                    'quality' => 100,
+                ]
+            );
+            $this->dropFile($path, $filename . '.jpg');
         }
     }
 
@@ -170,7 +198,7 @@ class ImageService
         string $path,
         string $filename
     ): void {
-        if (is_dir($path. 'thumbnails/')) {
+        if (is_dir($path . 'thumbnails/')) {
             foreach (glob($path . 'thumbnails/*') as $file) {
                 if (explode('_', $file)[1] === $filename) {
                     unlink($file);

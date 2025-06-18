@@ -46,7 +46,7 @@ class ImageService
             );
         }
 
-        $filename = (new DatetimeImmutable())->format('YmdHis');
+        $filename = (new DatetimeImmutable())->format('YmdHis') . rand(1000000, 9999999);
         $uploadFile = $path . $filename;
 
         file_put_contents($uploadFile, $request->getContent());
